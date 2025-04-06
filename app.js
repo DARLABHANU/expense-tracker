@@ -1,5 +1,5 @@
 document.addEventListener('DOMContentLoaded', () => {
-    const API_BASE_URL = 'http://localhost:5000/api/expenses';
+    const API_BASE_URL = 'https://expense-tracker-qruc.onrender.com/api/expenses';
     const expenseForm = document.getElementById('expense-form');
     const expensesContainer = document.getElementById('expenses-container');
     const totalAmountElement = document.getElementById('total-amount');
