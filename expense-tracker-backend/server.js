@@ -13,11 +13,19 @@ const PORT = process.env.PORT || 5000;
 // Connect to MongoDB
 connectDB();
 
+const corsOptions = {
+  origin: [
+    'https://CharmiMenda.github.io',  // GitHub Pages
+    'http://localhost:5500'            // For local testing
+  ]
+};
+app.use(cors(corsOptions));
 // Middleware
 app.use(cors({
     origin: '*', // Or specify your frontend URL
     methods: ['GET', 'POST', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type']
+
   }));
 app.use(express.json());
 app.use((req, res, next) => {
