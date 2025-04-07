@@ -1,87 +1,98 @@
 document.addEventListener('DOMContentLoaded', () => {
-  const API_BASE_URL = 'https://expense-tracker-qruc.onrender.com/api/expenses';
+  const API_BASE_URL = 'http://localhost:5000/api/expenses';
   const expenseForm = document.getElementById('expense-form');
   const expensesContainer = document.getElementById('expenses-container');
   const totalAmountElement = document.getElementById('total-amount');
   const expensesCountElement = document.getElementById('expenses-count');
+  const logoutBtn = document.getElementById('logout-btn');
 
-  // Shared fetch configuration
-  const fetchConfig = {
-    headers: {
-      'Content-Type': 'application/json',
-      'Accept': 'application/json'
-    },
-    credentials: 'same-origin' // Change to 'include' if using cookies
-  };
+  // Check authentication
+  const token = localStorage.getItem('token');
+  if (!token) {
+    window.location.href = 'auth.html';
+    return;
+  }
 
   // Load expenses when page loads
   loadExpenses();
+
+  // Logout handler
+  logoutBtn.addEventListener('click', () => {
+    localStorage.removeItem('token');
+    window.location.href = 'index.html';
+  });
 
   // Form submission handler
   expenseForm.addEventListener('submit', async (e) => {
     e.preventDefault();
     
-    const description = document.getElementById('description').value.trim();
+    const description = document.getElementById('description').value;
     const amount = parseFloat(document.getElementById('amount').value);
-
-    if (!description || isNaN(amount)) {
-      showAlert('Please enter valid description and amount', 'error');
+    
+    if (!description || !amount) {
+      showAlert('Please fill all fields', 'error');
       return;
     }
 
     try {
       const response = await fetch(API_BASE_URL, {
-        ...fetchConfig,
         method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
         body: JSON.stringify({ description, amount })
       });
 
+      const result = await response.json();
+      
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to add expense');
+        throw new Error(result.error || 'Failed to add expense');
       }
 
-      const newExpense = await response.json();
-      addExpenseToDOM(newExpense.data);
+      addExpenseToDOM(result.data);
       updateSummary();
       expenseForm.reset();
       showAlert('Expense added successfully!', 'success');
     } catch (error) {
-      console.error('Add Expense Error:', error);
-      showAlert(error.message || 'Failed to connect to server', 'error');
+      console.error('Error:', error);
+      showAlert(error.message, 'error');
     }
   });
 
   // Load expenses from API
   async function loadExpenses() {
     try {
-      expensesContainer.innerHTML = '<div class="loading">Loading expenses...</div>';
+      const response = await fetch(API_BASE_URL, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
       
-      const response = await fetch(API_BASE_URL, fetchConfig);
+      const result = await response.json();
       
       if (!response.ok) {
-        throw new Error(`Server returned ${response.status}`);
+        throw new Error(result.error || 'Failed to load expenses');
       }
 
-      const { data } = await response.json();
-      renderExpenses(data);
+      renderExpenses(result.data);
       updateSummary();
     } catch (error) {
-      console.error('Load Expenses Error:', error);
-      expensesContainer.innerHTML = `
-        <div class="error">
-          ${error.message}
-          <button onclick="location.reload()">Retry</button>
-        </div>
-      `;
+      console.error('Error:', error);
+      if (error.message.includes('token') || error.message.includes('Unauthorized')) {
+        localStorage.removeItem('token');
+        window.location.href = 'auth.html';
+      } else {
+        expensesContainer.innerHTML = `<div class="error">Error loading expenses: ${error.message}</div>`;
+      }
     }
   }
 
   // Render all expenses
   function renderExpenses(expenses) {
     expensesContainer.innerHTML = '';
-
-    if (expenses.length === 0) {
+    
+    if (!expenses || expenses.length === 0) {
       expensesContainer.innerHTML = '<div class="empty">No expenses found. Add your first expense!</div>';
       return;
     }
@@ -109,41 +120,39 @@ document.addEventListener('DOMContentLoaded', () => {
         <div class="expense-date">${date}</div>
       </div>
       <div class="expense-amount">₹${expense.amount.toFixed(2)}</div>
-      <button class="delete-btn" data-id="${expense._id}" aria-label="Delete expense">
-        <span aria-hidden="true">×</span>
-      </button>
+      <button class="delete-btn" data-id="${expense._id}">×</button>
     `;
     
-    expensesContainer.prepend(expenseElement);
+    expensesContainer.appendChild(expenseElement);
     
     // Add event listener to delete button
-    expenseElement.querySelector('.delete-btn').addEventListener('click', deleteExpense);
+    const deleteBtn = expenseElement.querySelector('.delete-btn');
+    deleteBtn.addEventListener('click', deleteExpense);
   }
 
   // Delete expense
   async function deleteExpense(e) {
-    const expenseId = e.currentTarget.dataset.id;
-    const expenseItem = e.currentTarget.closest('.expense-item');
+    const expenseId = e.target.dataset.id;
     
     try {
-      expenseItem.style.opacity = '0.5'; // Visual feedback
-      
       const response = await fetch(`${API_BASE_URL}/${expenseId}`, {
-        ...fetchConfig,
-        method: 'DELETE'
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
       });
 
+      const result = await response.json();
       if (!response.ok) {
-        throw new Error('Failed to delete expense');
+        throw new Error(result.error || 'Failed to delete expense');
       }
 
-      expenseItem.remove();
+      e.target.closest('.expense-item').remove();
       updateSummary();
       showAlert('Expense deleted successfully!', 'success');
     } catch (error) {
-      console.error('Delete Error:', error);
-      expenseItem.style.opacity = '1';
-      showAlert(error.message || 'Failed to delete expense', 'error');
+      console.error('Error:', error);
+      showAlert(error.message, 'error');
     }
   }
 
@@ -166,23 +175,16 @@ document.addEventListener('DOMContentLoaded', () => {
   function showAlert(message, type) {
     const alert = document.createElement('div');
     alert.className = `alert alert-${type}`;
-    alert.setAttribute('role', 'alert');
     alert.innerHTML = `
+      <i class="fas fa-${type === 'success' ? 'check-circle' : 'exclamation-circle'}"></i>
       ${message}
-      <button class="alert-close" aria-label="Close alert">×</button>
     `;
     
     document.body.appendChild(alert);
     
-    // Auto-remove after 5 seconds
-    const timer = setTimeout(() => {
-      alert.remove();
-    }, 5000);
-
-    // Manual close button
-    alert.querySelector('.alert-close').addEventListener('click', () => {
-      clearTimeout(timer);
-      alert.remove();
-    });
+    setTimeout(() => {
+      alert.classList.add('fade-out');
+      setTimeout(() => alert.remove(), 300);
+    }, 3000);
   }
 });
