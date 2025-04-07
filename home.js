@@ -9,7 +9,7 @@ if (!token) {
 
 async function fetchExpenses() {
   try {
-    const res = await fetch('http://localhost:5000/api/expenses', {
+    const res = await fetch('https://expense-tracker-2-6w2c.onrender.com/api/expenses', {
       headers: {
         'Authorization': `Bearer ${token}`
       }
