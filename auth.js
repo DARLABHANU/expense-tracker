@@ -1,5 +1,5 @@
 document.addEventListener('DOMContentLoaded', () => {
-    const API_BASE_URL = 'http://localhost:5000/api/auth';
+    const API_BASE_URL = 'https://expense-tracker-2-6w2c.onrender.com/api/auth';
     const loginForm = document.getElementById('login-form');
     const registerForm = document.getElementById('register-form');
     const tabButtons = document.querySelectorAll('.tab-btn');
